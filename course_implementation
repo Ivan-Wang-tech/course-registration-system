@@ -1,0 +1,353 @@
+# =============================================================
+#  Student Entity
+# =============================================================
+class Student:
+    MAX_CREDITS = 16
+
+    def __init__(self, student_id, name, password):
+        self.student_id = student_id
+        self.name = name
+        self.password = password
+        self.registered_courses = []
+
+    def get_registered_courses(self):
+        return self.registered_courses
+
+    def total_credits(self):
+        return sum(c.credits for c in self.registered_courses)
+
+    def credits_remaining(self):
+        return Student.MAX_CREDITS - self.total_credits()
+
+
+# =============================================================
+#  Course Entity
+# =============================================================
+class Course:
+    def __init__(self, course_id, title, instructor, credits, capacity):
+        self.course_id = course_id
+        self.title = title
+        self.instructor = instructor
+        self.credits = credits
+        self.capacity = capacity
+        self.enrolled_students = []
+
+    def is_full(self):
+        return len(self.enrolled_students) >= self.capacity
+
+    def enroll_student(self, student):
+        if not self.is_full():
+            self.enrolled_students.append(student)
+            return True
+        return False
+
+    def remove_student(self, student):
+        if student in self.enrolled_students:
+            self.enrolled_students.remove(student)
+            return True
+        return False
+
+
+# =============================================================
+#  Authentication Service
+# =============================================================
+class AuthenticationService:
+    def __init__(self):
+        self.students = []
+
+    def check_if_exists(self, student_id):
+        return any(s.student_id == student_id for s in self.students)
+
+    def sign_up(self, student_id, name, password):
+        if self.check_if_exists(student_id):
+            return None, "Student ID already exists."
+
+        new_student = Student(student_id, name, password)
+        self.students.append(new_student)
+        return new_student, "Success"
+
+    def login(self, student_id, password):
+        for s in self.students:
+            if s.student_id == student_id and s.password == password:
+                return s, "Login Success"
+        return None, "Invalid credentials."
+
+
+# =============================================================
+#  Course Catalog
+# =============================================================
+class CourseCatalog:
+    def __init__(self):
+        self.courses = []
+
+    def add_course(self, c):
+        self.courses.append(c)
+
+    def get_all_courses(self):
+        return self.courses
+
+    def find_course(self, cid):
+        for c in self.courses:
+            if c.course_id == cid:
+                return c
+        return None
+
+
+# =============================================================
+#  RegistrationManager
+# =============================================================
+class RegistrationManager:
+    def check_duplicate(self, student, course):
+        return course in student.registered_courses
+
+    def check_capacity(self, course):
+        return not course.is_full()
+
+    def check_credit_limit(self, student, course):
+        return student.total_credits() + course.credits <= Student.MAX_CREDITS
+
+    def register(self, student, course):
+        if self.check_duplicate(student, course):
+            return False, "Already registered."
+
+        if not self.check_capacity(course):
+            return False, "Course is full."
+
+        if not self.check_credit_limit(student, course):
+            return False, "You have exceeded maximum credit for the semester."
+
+        student.registered_courses.append(course)
+        course.enroll_student(student)
+
+        remaining = student.credits_remaining()
+        return True, f"Registration successful. Credits remaining: {remaining}."
+
+    def drop(self, student, course):
+        if course not in student.registered_courses:
+            return False, "You are not enrolled in this course."
+
+        student.registered_courses.remove(course)
+        course.remove_student(student)
+
+        remaining = student.credits_remaining()
+        return True, f"Course dropped. Credits remaining: {remaining}."
+
+
+# =============================================================
+#  Registration System Controller
+# =============================================================
+class RegistrationSystem:
+    def __init__(self):
+        self.auth_service = AuthenticationService()
+        self.course_catalog = CourseCatalog()
+        self.reg_manager = RegistrationManager()
+        self.current_user = None
+
+    def register_student(self, sid, name, pwd):
+        return self.auth_service.sign_up(sid, name, pwd)
+
+    def login(self, sid, pwd):
+        stu, msg = self.auth_service.login(sid, pwd)
+        if stu:
+            self.current_user = stu
+        return stu, msg
+
+    def logout(self):
+        self.current_user = None
+
+    def get_all_courses(self):
+        return self.course_catalog.get_all_courses()
+
+    def get_course_details(self, cid):
+        return self.course_catalog.find_course(cid)
+
+    def register_course(self, cid):
+        if not self.current_user:
+            return False, "You must be logged in."
+        c = self.course_catalog.find_course(cid)
+        if not c:
+            return False, "Course not found."
+        return self.reg_manager.register(self.current_user, c)
+
+    def drop_course(self, cid):
+        if not self.current_user:
+            return False, "You must be logged in."
+        c = self.course_catalog.find_course(cid)
+        if not c:
+            return False, "Course not found."
+        return self.reg_manager.drop(self.current_user, c)
+
+    def get_my_schedule(self):
+        if not self.current_user:
+            return []
+        return self.current_user.get_registered_courses()
+
+
+# =============================================================
+#  Console UI (Colab-friendly)
+# =============================================================
+class MainGUI:
+    def __init__(self, system):
+        self.system = system
+
+    def display_menu(self):
+        while True:
+            print("\n====== COURSE REGISTRATION SYSTEM ======")
+
+            if self.system.current_user is None:
+                print("1. Create Account")
+                print("2. Login")
+                print("0. Exit")
+            else:
+                print(f"Logged in as: {self.system.current_user.name} "
+                      f"(Credits remaining: {self.system.current_user.credits_remaining()})")
+                print("3. View Course List")
+                print("4. View Course Details")
+                print("5. Register for Course")
+                print("6. Drop Course")
+                print("7. View My Schedule")
+                print("8. Logout")
+                print("0. Exit")
+
+            choice = input("Enter choice: ")
+
+            if choice == "1" and self.system.current_user is None:
+                self.create_account()
+
+            elif choice == "2" and self.system.current_user is None:
+                self.login()
+
+            elif choice == "3" and self.system.current_user:
+                self.view_course_list()
+
+            elif choice == "4" and self.system.current_user:
+                self.view_course_details()
+
+            elif choice == "5" and self.system.current_user:
+                self.register_course()
+
+            elif choice == "6" and self.system.current_user:
+                self.drop_course()
+
+            elif choice == "7" and self.system.current_user:
+                self.view_schedule()
+
+            elif choice == "8" and self.system.current_user:
+                self.system.logout()
+                print("Logged out.")
+
+            elif choice == "0":
+                print("Goodbye!")
+                break
+
+            else:
+                print("Invalid choice.")
+
+    def create_account(self):
+        sid = input("Student ID: ")
+        name = input("Name: ")
+        pwd = input("Password: ")
+        _, msg = self.system.register_student(sid, name, pwd)
+        print(msg)
+
+    def login(self):
+        sid = input("Student ID: ")
+        pwd = input("Password: ")
+        _, msg = self.system.login(sid, pwd)
+        print(msg)
+
+    def view_course_list(self):
+        print("\n--- Course List ---")
+        for c in self.system.get_all_courses():
+            print(f"{c.course_id} | {c.title} | {c.credits} credits | "
+                  f"{len(c.enrolled_students)}/{c.capacity} seats")
+
+    def view_course_details(self):
+        cid = input("Course ID: ")
+        c = self.system.get_course_details(cid)
+        if not c:
+            print("Course not found.")
+            return
+        print(f"\nID: {c.course_id}")
+        print(f"Title: {c.title}")
+        print(f"Instructor: {c.instructor}")
+        print(f"Credits: {c.credits}")
+        print(f"Capacity: {c.capacity}")
+        print(f"Enrolled: {len(c.enrolled_students)}")
+
+    def register_course(self):
+        cid = input("Course ID: ")
+        ok, msg = self.system.register_course(cid)
+        print(msg)
+
+    def drop_course(self):
+        cid = input("Course ID: ")
+        ok, msg = self.system.drop_course(cid)
+        print(msg)
+
+    def view_schedule(self):
+        print("\n--- My Schedule ---")
+        schedule = self.system.get_my_schedule()
+        if not schedule:
+            print("You have no registered courses.")
+            return
+
+        for c in schedule:
+            print(f"{c.course_id} | {c.title} | {c.credits} credits")
+
+
+# =============================================================
+#  Initialize System + Add 5 Courses
+# =============================================================
+system = RegistrationSystem()
+
+# Computer Science-ish courses
+system.course_catalog.add_course(Course("CSCI-UA 101", "Intro to Computer Science", "Prof. Smith", 4, 50))
+system.course_catalog.add_course(Course("CSCI-UA 102", "Data Structures", "Prof. Allen", 4, 45))
+system.course_catalog.add_course(Course("CSCI-UA 201", "Computer Systems Organization", "Prof. Lee", 4, 40))
+system.course_catalog.add_course(Course("CSCI-UA 202", "Operating Systems", "Prof. Kumar", 4, 35))
+system.course_catalog.add_course(Course("CSCI-UA 310", "Basic Algorithms", "Prof. Chen", 4, 40))
+system.course_catalog.add_course(Course("CSCI-UA 321", "Programming Languages", "Prof. Davis", 4, 30))
+system.course_catalog.add_course(Course("CSCI-UA 330", "Databases", "Prof. Martinez", 4, 35))
+system.course_catalog.add_course(Course("CSCI-UA 340", "Computer Networks", "Prof. Nguyen", 4, 35))
+system.course_catalog.add_course(Course("CSCI-UA 350", "Software Engineering", "Prof. Patel", 4, 40))
+system.course_catalog.add_course(Course("CSCI-UA 360", "Machine Learning", "Prof. Zhao", 4, 30))
+system.course_catalog.add_course(Course("CSCI-UA 370", "Artificial Intelligence", "Prof. Roberts", 4, 30))
+system.course_catalog.add_course(Course("CSCI-UA 380", "Computer Graphics", "Prof. Thompson", 4, 30))
+system.course_catalog.add_course(Course("CSCI-UA 390", "Theory of Computation", "Prof. Gupta", 4, 25))
+system.course_catalog.add_course(Course("CSCI-UA 400", "Numerical Computing", "Prof. O'Brien", 4, 30))
+system.course_catalog.add_course(Course("CSCI-UA 410", "Parallel Computing", "Prof. Yang", 4, 30))
+
+# Mathematics / Supporting Math courses (for joint major)
+system.course_catalog.add_course(Course("MATH-UA 121", "Calculus I", "Prof. Stewart", 4, 60))
+system.course_catalog.add_course(Course("MATH-UA 122", "Calculus II", "Prof. Stewart", 4, 60))
+system.course_catalog.add_course(Course("MATH-UA 123", "Calculus III", "Prof. Huang", 4, 60))
+system.course_catalog.add_course(Course("MATH-UA 140", "Linear Algebra", "Prof. Lopez", 4, 50))
+system.course_catalog.add_course(Course("MATH-UA 150", "Discrete Mathematics", "Prof. Kim", 4, 50))
+system.course_catalog.add_course(Course("MATH-UA 160", "Probability & Statistics", "Prof. Wilson", 4, 50))
+system.course_catalog.add_course(Course("MATH-UA 200", "Ordinary Differential Equations", "Prof. Baker", 4, 45))
+system.course_catalog.add_course(Course("MATH-UA 210", "Real Analysis I", "Prof. Zhao", 4, 40))
+system.course_catalog.add_course(Course("MATH-UA 220", "Abstract Algebra I", "Prof. Singh", 4, 35))
+system.course_catalog.add_course(Course("MATH-UA 230", "Topology I", "Prof. Garcia", 4, 30))
+system.course_catalog.add_course(Course("MATH-UA 240", "Complex Variables", "Prof. Tran", 4, 30))
+system.course_catalog.add_course(Course("MATH-UA 250", "Probability Theory", "Prof. O'Connor", 4, 40))
+system.course_catalog.add_course(Course("MATH-UA 260", "Statistics & Data Analysis", "Prof. Martinez", 4, 50))
+system.course_catalog.add_course(Course("MATH-UA 270", "Numerical Methods", "Prof. Chen", 4, 40))
+
+# Some elective / advanced courses
+system.course_catalog.add_course(Course("CSCI-UA 420", "Machine Learning & Data Mining", "Prof. Gupta", 4, 30))
+system.course_catalog.add_course(Course("CSCI-UA 430", "Cryptography and Security", "Prof. Roy", 4, 25))
+system.course_catalog.add_course(Course("CSCI-UA 440", "Operating Systems II", "Prof. Kumar", 4, 20))
+system.course_catalog.add_course(Course("CSCI-UA 450", "Advanced Algorithms", "Prof. Lee", 4, 20))
+system.course_catalog.add_course(Course("MATH-UA 300", "Real Analysis II", "Prof. White", 4, 25))
+system.course_catalog.add_course(Course("MATH-UA 310", "Functional Analysis", "Prof. Zhao", 4, 20))
+system.course_catalog.add_course(Course("MATH-UA 320", "Probability & Stochastic Processes", "Prof. Johnson", 4, 25))
+system.course_catalog.add_course(Course("MATH-UA 330", "Partial Differential Equations", "Prof. Green", 4, 20))
+system.course_catalog.add_course(Course("MATH-UA 340", "Numerical Linear Algebra", "Prof. Chen", 4, 25))
+system.course_catalog.add_course(Course("MATH-UA 350", "Graph Theory & Combinatorics", "Prof. Kim", 4, 25))
+system.course_catalog.add_course(Course("MATH-UA 360", "Mathematical Statistics", "Prof. Lee", 4, 25))
+system.course_catalog.add_course(Course("MATH-UA 370", "Topology II", "Prof. Garcia", 4, 20))
+system.course_catalog.add_course(Course("MATH-UA 380", "Differential Geometry", "Prof. Tran", 4, 20))
+
+ui = MainGUI(system)
+ui.display_menu()
