@@ -184,7 +184,7 @@ class RegistrationSystem:
 
 
 # =============================================================
-#  Console UI (Colab-friendly)
+#  Console UI
 # =============================================================
 class MainGUI:
     def __init__(self, system):
@@ -297,7 +297,7 @@ class MainGUI:
 
 
 # =============================================================
-#  Initialize System + Add 5 Courses
+#  Initialize System
 # =============================================================
 system = RegistrationSystem()
 
