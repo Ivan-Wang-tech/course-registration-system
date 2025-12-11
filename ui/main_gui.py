@@ -439,44 +439,52 @@ class MainGUI:
         table_frame = ctk.CTkScrollableFrame(content)
         table_frame.pack(fill="both", expand=True)
         
-        # Table header row
+        # Header - Only Course Name and Action
         header_row = ctk.CTkFrame(table_frame, fg_color="#e2e8f0")
         header_row.pack(fill="x", pady=(0, 5))
         
-        col_widths = [130, 280, 150, 120, 150]
-        headers = ["Course ID", "Title", "Instructor", "Credits", "Enrollment"]
+        ctk.CTkLabel(
+            header_row,
+            text="Course Name",
+            font=("Segoe UI", 11, "bold"),
+            width=500,
+            anchor="w"
+        ).grid(row=0, column=0, padx=20, pady=10)
         
-        for i, h in enumerate(headers):
-            ctk.CTkLabel(
-                header_row,
-                text=h,
-                font=("Segoe UI", 11, "bold"),
-                width=col_widths[i],
-                anchor="center" if i >= 3 else "w"
-            ).grid(row=0, column=i, padx=10, pady=10)
+        ctk.CTkLabel(
+            header_row,
+            text="Action",
+            font=("Segoe UI", 11, "bold"),
+            width=100,
+            anchor="center"
+        ).grid(row=0, column=1, padx=20, pady=10)
         
-        # Data rows
+        # Data rows - Show only course title and register button
         for c in courses:
-            row = ctk.CTkFrame(table_frame)
+            row = ctk.CTkFrame(table_frame, fg_color="transparent")
             row.pack(fill="x", pady=2)
             
-            values = [
-                c.course_id,
-                c.title[:30] + "..." if len(c.title) > 30 else c.title,
-                c.instructor,
-                str(c.credits),
-                f"{len(c.enrolled_students)}/{c.capacity}"
-            ]
+            def make_detail_handler(course):
+                def handler():
+                    self.show_course_detail_window(course)
+                return handler
             
-            for i, val in enumerate(values):
-                ctk.CTkLabel(
-                    row,
-                    text=val,
-                    width=col_widths[i],
-                    anchor="center" if i >= 3 else "w"
-                ).grid(row=0, column=i, padx=10, pady=8)
+            # Clickable course title
+            course_btn = ctk.CTkButton(
+                row,
+                text=c.title,
+                width=500,
+                height=40,
+                anchor="w",
+                fg_color="transparent",
+                text_color=("blue", "lightblue"),
+                hover_color="#f0f0f0",
+                font=("Segoe UI", 12),
+                command=make_detail_handler(c)
+            )
+            course_btn.grid(row=0, column=0, padx=20, pady=5, sticky="w")
             
-            def make_handler(course):
+            def make_register_handler(course):
                 def handler():
                     ok, msg = self.system.register_course(course.course_id)
                     if ok:
@@ -490,10 +498,140 @@ class MainGUI:
             ctk.CTkButton(
                 row,
                 text="Register",
-                width=80,
-                height=30,
-                command=make_handler(c)
-            ).grid(row=0, column=5, padx=10)
+                width=100,
+                height=35,
+                command=make_register_handler(c)
+            ).grid(row=0, column=1, padx=20, pady=5)
+    
+    def show_course_detail_window(self, course):
+        """Show detailed information about a course."""
+        detail_win = ctk.CTkToplevel(self.root)
+        detail_win.title("Course Details")
+        detail_win.geometry("600x500")
+        
+        # Header
+        header = ctk.CTkFrame(detail_win, height=70)
+        header.pack(fill="x")
+        
+        ctk.CTkLabel(
+            header,
+            text="📚 Course Details",
+            font=("Segoe UI", 20, "bold")
+        ).pack(side="left", padx=20, pady=20)
+        
+        # Content
+        content = ctk.CTkFrame(detail_win)
+        content.pack(fill="both", expand=True, padx=40, pady=30)
+        
+        # Course details card
+        card = ctk.CTkFrame(content, corner_radius=15)
+        card.pack(fill="both", expand=True, padx=20, pady=20)
+        
+        # Course Title
+        ctk.CTkLabel(
+            card,
+            text=course.title,
+            font=("Segoe UI", 24, "bold"),
+            wraplength=500
+        ).pack(pady=(30, 20))
+        
+        # Details frame
+        details = ctk.CTkFrame(card, fg_color="transparent")
+        details.pack(fill="both", expand=True, padx=40, pady=10)
+        
+        # Course ID
+        info_row = ctk.CTkFrame(details, fg_color="transparent")
+        info_row.pack(fill="x", pady=10)
+        ctk.CTkLabel(
+            info_row,
+            text="Course ID:",
+            font=("Segoe UI", 13, "bold"),
+            anchor="w",
+            width=150
+        ).pack(side="left")
+        ctk.CTkLabel(
+            info_row,
+            text=course.course_id,
+            font=("Segoe UI", 13),
+            anchor="w"
+        ).pack(side="left")
+        
+        # Instructor
+        info_row = ctk.CTkFrame(details, fg_color="transparent")
+        info_row.pack(fill="x", pady=10)
+        ctk.CTkLabel(
+            info_row,
+            text="Instructor:",
+            font=("Segoe UI", 13, "bold"),
+            anchor="w",
+            width=150
+        ).pack(side="left")
+        ctk.CTkLabel(
+            info_row,
+            text=course.instructor,
+            font=("Segoe UI", 13),
+            anchor="w"
+        ).pack(side="left")
+        
+        # Credits
+        info_row = ctk.CTkFrame(details, fg_color="transparent")
+        info_row.pack(fill="x", pady=10)
+        ctk.CTkLabel(
+            info_row,
+            text="Credits:",
+            font=("Segoe UI", 13, "bold"),
+            anchor="w",
+            width=150
+        ).pack(side="left")
+        ctk.CTkLabel(
+            info_row,
+            text=str(course.credits),
+            font=("Segoe UI", 13),
+            anchor="w"
+        ).pack(side="left")
+        
+        # Capacity
+        info_row = ctk.CTkFrame(details, fg_color="transparent")
+        info_row.pack(fill="x", pady=10)
+        ctk.CTkLabel(
+            info_row,
+            text="Capacity:",
+            font=("Segoe UI", 13, "bold"),
+            anchor="w",
+            width=150
+        ).pack(side="left")
+        ctk.CTkLabel(
+            info_row,
+            text=str(course.capacity),
+            font=("Segoe UI", 13),
+            anchor="w"
+        ).pack(side="left")
+        
+        # Number of Enrolled Students
+        info_row = ctk.CTkFrame(details, fg_color="transparent")
+        info_row.pack(fill="x", pady=10)
+        ctk.CTkLabel(
+            info_row,
+            text="Enrolled Students:",
+            font=("Segoe UI", 13, "bold"),
+            anchor="w",
+            width=150
+        ).pack(side="left")
+        ctk.CTkLabel(
+            info_row,
+            text=f"{len(course.enrolled_students)} / {course.capacity}",
+            font=("Segoe UI", 13),
+            anchor="w"
+        ).pack(side="left")
+        
+        # Close button
+        ctk.CTkButton(
+            card,
+            text="Close",
+            width=120,
+            height=40,
+            command=detail_win.destroy
+        ).pack(pady=(20, 30))
 
     # =============================================================
     # Schedule Window
